@@ -66,6 +66,7 @@ class Search_google:
                             results.append(result)
                     except (StaleElementReferenceException, IndexError):
                         continue
+            self.close()
             return results[:max_results]
         except Exception as e:
             print(f"Ошибка при поиске: {e}")
@@ -116,5 +117,6 @@ class Search_google:
 
     def __del__(self):
         self.close()
+
 
 

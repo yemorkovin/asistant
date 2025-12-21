@@ -51,7 +51,7 @@ class Voice:
             with self.microphone as source:
                 print("Слушаю...")
                 # Увеличиваем timeout и phrase_time_limit для лучшего распознавания
-                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=8)
+                audio = self.recognizer.listen(source, timeout=20, phrase_time_limit=20)
 
             print("Распознаю речь...")
             text = self.recognizer.recognize_google(audio, language='ru-RU')
@@ -79,8 +79,17 @@ class Voice:
         if qr.get_intent(command) == 'greeting':
             self.speak("Привет! Рад вас слышать!")
         elif qr.get_intent(command) == "search":
+            commands_words = command.split()
+            for i in range(len(commands_words)):
+                if qr.get_intent(commands_words[i]) == 'search':
+                    command = command.replace(commands_words[i], '')
+            command = command.strip()
+            if command.startswith('в '):
+                command = command[2:]
+
             ss = self.google.search(command)
             sss = []
+            ss_d = ''
             for i, res in enumerate(ss, 1):
                 if res.get('description') == '':
                     continue
@@ -89,7 +98,12 @@ class Voice:
                     'link': res.get('url', ''),
                     'description': res.get('description', '')
                 })
-            print(sss)
+                ss_d += f'{res.get('title', 'Без заголовка')}. '
+            ress = f'Найдено { num2words(len(sss), lang='ru')} страниц'
+            ress += ss_d
+
+            self.speak(ress)
+
 
         elif qr.get_intent(command) == 'time':
             h = datetime.now().strftime("%H")
@@ -107,7 +121,6 @@ class Voice:
         elif qr.get_intent(command) == 'farewell':
             self.speak("До свидания! Выключаюсь.")
             self.is_listening = False
-
         else:
             self.speak("Пока не понимаю эту команду.")
 
@@ -115,27 +128,35 @@ class Voice:
         print("Цикл прослушивания запущен")
         self.speak("Ассистент запущен. Говорите команды")
 
-        while self.is_listening:
-            command = self.listen()
-            if command and command.strip():
-                self.process_command(command)
-            time.sleep(0.5)
+
+        while True:
+            if self.is_listening:
+                command = self.listen()
+                if command and command.strip():
+                    self.process_command(command)
+                    time.sleep(0.5)
+            else:
+                #self.speak("Ассистент запущен в спящий режим")
+                command = self.listen()
+                if command:
+                    if command.lower().strip() == 'шустрик проснись':
+                        self.is_listening = True
 
     def start_listening(self):
         if self.is_listening:
             print("Уже слушаем...")
             return
-
         self.is_listening = True
-        self.listening_thread = threading.Thread(target=self.listening_loop)
-        self.listening_thread.daemon = True
-        self.listening_thread.start()
+        self.listening_loop()
+
+        #self.listening_thread = threading.Thread(target=self.listening_loop)
+        #self.listening_thread.daemon = True
+        #self.listening_thread.start()
         print("Прослушивание запущено")
 
 
 if __name__ == "__main__":
     v = Voice()
-
     try:
         v.start_listening()
         print("Ассистент активен. Нажмите Ctrl+C для остановки.")
