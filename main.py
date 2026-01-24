@@ -2,6 +2,8 @@ import time
 import speech_recognition as sr
 import threading
 from datetime import datetime
+
+from scan_disc import ProgramSearcher
 from siler_audio import Silero_
 from num2words import num2words
 from query_request import Query
@@ -9,6 +11,8 @@ from pyowm import OWM
 from dotenv import load_dotenv
 import os
 from search_google import Search_google
+import json
+from wikipedia_ import Wiki
 
 audio_silero = Silero_()
 qr = Query()
@@ -18,8 +22,18 @@ load_dotenv()
 
 class Voice:
     def __init__(self):
+        with open('data.json', 'r', encoding='utf-8') as f:
+            self.data = json.load(f)['intents'].keys()
+            print(self.data)
+        self.ps = ProgramSearcher()
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
+        import  pyaudio
+        p = pyaudio.PyAudio()
+        info = p.get_device_info_by_index(0)
+        numdevices = info.get('deviceCount')
+        print(f'Найдено {numdevices} аудиустройств')
+
         self.is_listening = False
 
         self.listening_thread = None
@@ -67,25 +81,56 @@ class Voice:
             print(f"Ошибка слушания: {e}")
             return ""
 
+    def delete_command(self, command, indent):
+        commands_words = command.split()
+        for i in range(len(commands_words)):
+            print(qr.get_intent(commands_words[i]), command, indent)
+            if qr.get_intent(commands_words[i]) == indent:
+
+                command = command.replace(commands_words[i], '')
+        command = command.strip()
+        if command.startswith('в '):
+            command = command[2:]
+        return command
+
     def process_command(self, command):
         if not command:
             return
+        index = command.find('шустрик')
+        if index != -1:
+            command = command[index:]
         if not command.startswith('шустрик'):
             return
 
+
+
         print(f"Команда: {command}")
 
-        command = command.replace('шустрик', '')
+        command = command.replace('шустрик', '').strip()
+        args = command
+        for dd in self.data:
+            args = self.delete_command(command, dd)
+        set1 = set(command.split())
+        set2 = set(args.split())
+        set3 = set1 - set2
+        command = ' '.join(list(set3))
         if qr.get_intent(command) == 'greeting':
             self.speak("Привет! Рад вас слышать!")
+        elif qr.get_intent(command) == 'wikipedia':
+            w = Wiki()
+            c = w.search('Популярный язык программирования')
+            self.speak(c['title'])
+            self.speak(c['content'])
         elif qr.get_intent(command) == "search":
-            commands_words = command.split()
+            '''commands_words = command.split()
             for i in range(len(commands_words)):
                 if qr.get_intent(commands_words[i]) == 'search':
                     command = command.replace(commands_words[i], '')
             command = command.strip()
             if command.startswith('в '):
                 command = command[2:]
+            '''
+            command = self.delete_command(command, 'search')
 
             ss = self.google.search(command)
             sss = []
@@ -103,8 +148,6 @@ class Voice:
             ress += ss_d
 
             self.speak(ress)
-
-
         elif qr.get_intent(command) == 'time':
             h = datetime.now().strftime("%H")
             m = datetime.now().strftime("%M")
@@ -121,6 +164,9 @@ class Voice:
         elif qr.get_intent(command) == 'farewell':
             self.speak("До свидания! Выключаюсь.")
             self.is_listening = False
+        elif qr.get_intent(command) == 'open_program':
+            command = self.delete_command(command, 'open_program')
+            self.speak(self.ps.search_s(command))
         else:
             self.speak("Пока не понимаю эту команду.")
 
@@ -132,6 +178,7 @@ class Voice:
         while True:
             if self.is_listening:
                 command = self.listen()
+
                 if command and command.strip():
                     self.process_command(command)
                     time.sleep(0.5)
