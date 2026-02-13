@@ -3,6 +3,8 @@ import speech_recognition as sr
 import threading
 from datetime import datetime
 
+from Thread_ import Thread_
+from commands.schedule_by_day import schedule
 from scan_disc import ProgramSearcher
 from siler_audio import Silero_
 from num2words import num2words
@@ -13,6 +15,7 @@ import os
 from search_google import Search_google
 import json
 from wikipedia_ import Wiki
+from schedule.parser_csv_json import get_schedule
 
 audio_silero = Silero_()
 qr = Query()
@@ -22,17 +25,15 @@ load_dotenv()
 
 class Voice:
     def __init__(self):
+        self.q = Thread_()
+        self.q.start()
         with open('data.json', 'r', encoding='utf-8') as f:
             self.data = json.load(f)['intents'].keys()
             print(self.data)
         self.ps = ProgramSearcher()
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
-        import  pyaudio
-        p = pyaudio.PyAudio()
-        info = p.get_device_info_by_index(0)
-        numdevices = info.get('deviceCount')
-        print(f'Найдено {numdevices} аудиустройств')
+
 
         self.is_listening = False
 
@@ -43,7 +44,10 @@ class Voice:
 
     def speak(self, text):
         print(f"[speak] {text}")
-        audio_silero.silero_tts_basic(text)
+        #audio_silero.silero_tts_basic(text)
+        self.q.add(audio_silero.silero_tts_basic, text)
+        #thread = threading.Thread(target=audio_silero.silero_tts_basic, args=(text,))
+        #thread.start()
 
     def stop(self):
         print("[stop] Остановка...")
@@ -84,7 +88,6 @@ class Voice:
     def delete_command(self, command, indent):
         commands_words = command.split()
         for i in range(len(commands_words)):
-            print(qr.get_intent(commands_words[i]), command, indent)
             if qr.get_intent(commands_words[i]) == indent:
 
                 command = command.replace(commands_words[i], '')
@@ -96,24 +99,23 @@ class Voice:
     def process_command(self, command):
         if not command:
             return
-        index = command.find('шустрик')
+        index = command.find('квант')
         if index != -1:
             command = command[index:]
-        if not command.startswith('шустрик'):
+        if not command.startswith('квант'):
             return
-
-
-
+        
         print(f"Команда: {command}")
 
-        command = command.replace('шустрик', '').strip()
+        command = command.replace('квант', '').strip()
         args = command
         for dd in self.data:
             args = self.delete_command(command, dd)
-        set1 = set(command.split())
-        set2 = set(args.split())
-        set3 = set1 - set2
-        command = ' '.join(list(set3))
+        #set1 = set(command.split())
+        #set2 = set(args.split())
+        #set3 = set1 - set2
+        #command = ' '.join(list(set3))
+        print(f'Команда11: {command}')
         if qr.get_intent(command) == 'greeting':
             self.speak("Привет! Рад вас слышать!")
         elif qr.get_intent(command) == 'wikipedia':
@@ -164,6 +166,8 @@ class Voice:
         elif qr.get_intent(command) == 'farewell':
             self.speak("До свидания! Выключаюсь.")
             self.is_listening = False
+        elif qr.get_intent(command) == 'schedule_by_day':
+            schedule(command, self.speak)
         elif qr.get_intent(command) == 'open_program':
             command = self.delete_command(command, 'open_program')
             self.speak(self.ps.search_s(command))
@@ -186,7 +190,7 @@ class Voice:
                 #self.speak("Ассистент запущен в спящий режим")
                 command = self.listen()
                 if command:
-                    if command.lower().strip() == 'шустрик проснись':
+                    if command.lower().strip() == 'квант проснись':
                         self.is_listening = True
 
     def start_listening(self):
