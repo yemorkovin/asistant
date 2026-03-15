@@ -26,7 +26,7 @@ class Thread_:
         if not self.running:
             raise RuntimeError('Очередь не запущена')
         task = (func, args)
-        self.clear()
+
         self.queue.put(task)
 
     def process_queue(self):

@@ -4,18 +4,17 @@ import threading
 from datetime import datetime
 
 from Thread_ import Thread_
-from commands.schedule_by_day import schedule
+from commands.schedule_by_day import schedule_subject
 from scan_disc import ProgramSearcher
 from siler_audio import Silero_
 from num2words import num2words
 from query_request import Query
-from pyowm import OWM
 from dotenv import load_dotenv
-import os
 from search_google import Search_google
 import json
+import models
+from vosk_recognizer import get_text
 from wikipedia_ import Wiki
-from schedule.parser_csv_json import get_schedule
 
 audio_silero = Silero_()
 qr = Query()
@@ -25,20 +24,15 @@ load_dotenv()
 
 class Voice:
     def __init__(self):
+
+        self.model_weather = models.Load_model.model_sentence_transformer
         self.q = Thread_()
         self.q.start()
         with open('data.json', 'r', encoding='utf-8') as f:
             self.data = json.load(f)['intents'].keys()
-            print(self.data)
         self.ps = ProgramSearcher()
-        self.recognizer = sr.Recognizer()
-        self.microphone = sr.Microphone()
-
-
         self.is_listening = False
-
         self.listening_thread = None
-
         self.calibrate_microphone()
         self.google = Search_google()
 
@@ -66,13 +60,8 @@ class Voice:
 
     def listen(self):
         try:
-            with self.microphone as source:
-                print("Слушаю...")
-                # Увеличиваем timeout и phrase_time_limit для лучшего распознавания
-                audio = self.recognizer.listen(source, timeout=20, phrase_time_limit=20)
-
+            text = get_text()
             print("Распознаю речь...")
-            text = self.recognizer.recognize_google(audio, language='ru-RU')
             print(f"Распознано: {text}")
             return text.lower()
 
@@ -99,23 +88,16 @@ class Voice:
     def process_command(self, command):
         if not command:
             return
-        index = command.find('квант')
+        index = command.find('барсик')
         if index != -1:
             command = command[index:]
-        if not command.startswith('квант'):
+        if not command.startswith('барсик'):
             return
         
         print(f"Команда: {command}")
-
-        command = command.replace('квант', '').strip()
-        args = command
-        for dd in self.data:
-            args = self.delete_command(command, dd)
-        #set1 = set(command.split())
-        #set2 = set(args.split())
-        #set3 = set1 - set2
-        #command = ' '.join(list(set3))
-        print(f'Команда11: {command}')
+        command = command.replace('барсик', '').strip()
+        if qr.get_intent(command):
+            self.q.clear()
         if qr.get_intent(command) == 'greeting':
             self.speak("Привет! Рад вас слышать!")
         elif qr.get_intent(command) == 'wikipedia':
@@ -157,17 +139,19 @@ class Voice:
             a_m = num2words(m, lang='ru')
             self.speak(f"Сейчас {a_h} {a_m}")
         elif qr.get_intent(command) == 'weather':
-            own = OWM(os.getenv('API_KEY_WEATHER'))
-            mgr = own.weather_manager()
-            obs = mgr.weather_at_place('Москва,RU')
-            weather = obs.weather
-            res = f'Температура: {num2words(round(weather.temperature('celsius')['temp']), lang='ru')} градусов. Влажность: {num2words(round(weather.humidity), lang='ru')}%'
-            self.speak(f"Сейчас {res}")
+            from commands.weather import get_weather
+            from parser_weather import parser
+            try:
+                parser()
+                w = get_weather(command, self.model_weather)
+                self.speak(f"{w}")
+            except:
+                pass
         elif qr.get_intent(command) == 'farewell':
             self.speak("До свидания! Выключаюсь.")
             self.is_listening = False
         elif qr.get_intent(command) == 'schedule_by_day':
-            schedule(command, self.speak)
+            schedule_subject(command, self.speak)
         elif qr.get_intent(command) == 'open_program':
             command = self.delete_command(command, 'open_program')
             self.speak(self.ps.search_s(command))
@@ -187,7 +171,6 @@ class Voice:
                     self.process_command(command)
                     time.sleep(0.5)
             else:
-                #self.speak("Ассистент запущен в спящий режим")
                 command = self.listen()
                 if command:
                     if command.lower().strip() == 'квант проснись':
@@ -199,10 +182,6 @@ class Voice:
             return
         self.is_listening = True
         self.listening_loop()
-
-        #self.listening_thread = threading.Thread(target=self.listening_loop)
-        #self.listening_thread.daemon = True
-        #self.listening_thread.start()
         print("Прослушивание запущено")
 
 
