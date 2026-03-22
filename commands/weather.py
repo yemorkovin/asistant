@@ -108,9 +108,13 @@ def get_weather(query, model=None):
                 f'Погода на {t} в Коробово. Минимальная температура {num2words(today.iloc[0]['temp_min'], lang='ru')} градуса. '
                 f'Максимальная температура {num2words(today.iloc[0]['temp_max'], lang='ru')} градуса. '
                 f'{today.iloc[0]['description']}')
+        else:
+            data_weather = pd.read_csv('weather_data_now.csv')
+            return (
+                f'Погода сейчас в Коробово. Температура {num2words(data_weather.iloc[0]['now_weather'], lang='ru')} градуса. '
+                f'Ощущается как {num2words(data_weather.iloc[0]['now_feel'], lang='ru')} градуса. '
+                f'{data_weather.iloc[0]['now_desc']}')
 
 
 
-print(get_weather('Погода сегодня'))
-
-
+#print(get_weather('Погода'))
