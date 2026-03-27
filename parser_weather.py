@@ -93,6 +93,7 @@ def parser():
             now_hum = info
             break
 
+
     weather_data_now = [{
         'datetime': now_localdate.strip(),
         'now_weather': now_weather,

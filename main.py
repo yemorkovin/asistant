@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from search_google import Search_google
 import json
 import models
+from user_data.change_city import change_city, get_weather_link
 from vosk_recognizer import get_text
 from wikipedia_ import Wiki
 
@@ -155,6 +156,13 @@ class Voice:
         elif qr.get_intent(command) == 'open_program':
             command = self.delete_command(command, 'open_program')
             self.speak(self.ps.search_s(command))
+        elif qr.get_intent(command) == 'change_city':
+            city = change_city(command)
+            if city!= None:
+                get_weather_link(city)
+                self.speak(f'Город изменен на {city}')
+            else:
+                get_weather_link()
         else:
             self.speak("Пока не понимаю эту команду.")
 
